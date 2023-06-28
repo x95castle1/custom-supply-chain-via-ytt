@@ -8,16 +8,10 @@ stringData:
   ootb-supply-chain-overlay.yaml: |
     #@ load("@ytt:overlay", "overlay")
     #@ load("@ytt:template", "template")
-        
-    #@ def replace_value_to_default(left, right):
-    #@   if "default" in left:
-    #@     return left
-    #@   end
-    #@   param = dict(left)
-    #@   param.update({"default": param.pop("value")})
-    #@   return param
-    #@ end
-    
+            
+    #! This first overlay is an example of removing a step from the supply ootb-supply-chain-overlay
+    #! For example, let's say you don't want to test or scan source code, but you do images
+    #! then this overlay will remove the first step. 
     #@overlay/match by=overlay.subset({"apiVersion": "carto.run/v1alpha1", "kind": "ClusterSupplyChain","metadata":{"name":"source-test-scan-to-url"}}), expects="0+"
     ---
     spec:
@@ -26,6 +20,7 @@ stringData:
       #@overlay/remove
       - name: source-tester
 
+    #! This will remove the source scanning step
     #@overlay/match by=overlay.subset({"apiVersion": "carto.run/v1alpha1", "kind": "ClusterSupplyChain","metadata":{"name":"source-test-scan-to-url"}}), expects="0+"
     ---
     spec:
@@ -34,6 +29,9 @@ stringData:
       #@overlay/remove
       - name: source-scanner
 
+    #! This overlay takes the image-provider step and changes it sources to the output 
+    #! of the source-provider step instead of the source-scanner step. 
+    #! This creates a connection between those steps in the supply chain.
     #@overlay/match by=overlay.subset({"apiVersion": "carto.run/v1alpha1", "kind": "ClusterSupplyChain","metadata":{"name":"source-test-scan-to-url"}}), expects="0+"
     ---
     spec:
@@ -45,38 +43,8 @@ stringData:
         - resource: source-provider
           name: source
 
-    #@overlay/match by=overlay.subset({"kind":"ClusterSupplyChain"}), expects="0+"
-    ---
-    spec:
-      params:
-        #@overlay/match by="name", expects="0+"
-        #@overlay/replace via=replace_value_to_default
-        - name: maven_repository_url
-
-    #@overlay/match by=overlay.subset({"kind":"ClusterSupplyChain"}), expects="0+"
-    ---
-    spec:
-      params:
-        #@overlay/match by="name", expects="0+"
-        #@overlay/replace via=replace_value_to_default
-        - name: maven_repository_secret_name
-
-
-    #@overlay/match by=overlay.subset({"kind":"ClusterSupplyChain"}), expects="0+"
-    ---
-    spec:
-      params:
-      #@overlay/append
-      - name: deliverable_server_address
-        default: "ssh://git@github.com"  
-      - name: deliverable_repository_owner
-        default: "pakiheart" 
-      - name: deliverable_repository_name
-        default: "tap-gitops-deliverable"
-      - name: deliverable_branch
-        default: main
-
-
+    #! This overlay removes the creation of the deliverable from the supply chain.
+    #! We will be writing the deliverable to git config repo instead
     #@overlay/match by=overlay.subset({"apiVersion": "carto.run/v1alpha1", "kind": "ClusterSupplyChain","metadata":{"name":"source-test-scan-to-url"}}), expects="0+"
     ---
     spec:
@@ -85,6 +53,11 @@ stringData:
       #@overlay/remove
       - name: deliverable
 
+    #! This overlay adds two additional steps to the supply chain to config-writer
+    #! the deliverable produced by the supply chain to a git config repo.
+    #! The deliverable-config and deliverable-config-writer steps are new
+    #! supply chain steps introducted to write the deliverable to a configmap
+    #! and then write it to a config repo in git. 
     #@overlay/match by=overlay.subset({"kind":"ClusterSupplyChain"}), expects="0+"
     ---
     spec:
@@ -110,7 +83,9 @@ stringData:
           kind: ClusterTemplate
           name: config-writer-deliverable-template
 
-
+    #! This step changes the config-writer step from a ClusterTemplate to a 
+    #! ClusterConfigTemplate. This needs to change to allow the last step of the 
+    #! ootb supply chain to pass control to the new deliverable-config step.
     #@overlay/match by=overlay.subset({"kind":"ClusterSupplyChain"}), expects="0+"
     ---
     spec:
